@@ -27,6 +27,7 @@ import lightgbm as lgb
 import catboost as ctb
 import logging
 import numpy as np
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -191,3 +192,50 @@ def fill_params(
 
     logger.info("Model parameters filled")
     return config
+
+
+def classification_data(n_classes=2):
+    # Create dummy datasets for testing
+    train_data = pd.DataFrame(
+        np.random.rand(100, 5),
+        columns=["feat1", "feat2", "feat3", "feat4", "feat5"],
+    )
+    train_target = pd.Series(np.random.randint(0, n_classes, 100))
+
+    val_data = pd.DataFrame(
+        np.random.rand(50, 5), columns=["feat1", "feat2", "feat3", "feat4", "feat5"]
+    )
+    val_target = pd.Series(np.random.randint(0, n_classes, 50))
+    test_data = pd.DataFrame(
+        np.random.rand(30, 5), columns=["feat1", "feat2", "feat3", "feat4", "feat5"]
+    )
+    test_target = pd.Series(np.random.randint(0, n_classes, 30))
+
+    return {
+        "train": (train_data, train_target),
+        "val": (val_data, val_target),
+        "test": (test_data, test_target),
+    }
+
+
+def regression_data():
+    # Create dummy datasets for testing
+    train_data = pd.DataFrame(
+        np.random.rand(100, 5),
+        columns=["feat1", "feat2", "feat3", "feat4", "feat5"],
+    )
+    train_target = pd.Series(np.random.rand(100))
+    val_data = pd.DataFrame(
+        np.random.rand(50, 5), columns=["feat1", "feat2", "feat3", "feat4", "feat5"]
+    )
+    val_target = pd.Series(np.random.rand(50))
+    test_data = pd.DataFrame(
+        np.random.rand(30, 5), columns=["feat1", "feat2", "feat3", "feat4", "feat5"]
+    )
+    test_target = pd.Series(np.random.rand(30))
+
+    return {
+        "train": (train_data, train_target),
+        "val": (val_data, val_target),
+        "test": (test_data, test_target),
+    }
