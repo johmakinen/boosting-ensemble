@@ -48,6 +48,8 @@ class EnsembleModel:
         self.meta_data = None
         self.final_model = None
         self.datasets_ = datasets_
+        self.eval_results = None
+
         self.fill_params_()
 
     def fill_params_(self):
@@ -154,7 +156,7 @@ class EnsembleModel:
         )
         logger.info("Ensemble trained")
 
-    def evaluate(self):
+    def evaluate(self,plot=True):
         """
         Evaluates the final model of the ensemble.
 
@@ -163,9 +165,12 @@ class EnsembleModel:
         """
         if self.final_model is None:
             raise ValueError("Train ensemble first")
-        evaluate_model(
+        self.eval_results = evaluate_model(
             model=self.final_model,
             config=self.config,
             meta_data=self.meta_data,
             task=self.task,
+            plot=plot,
         )
+        logger.info("Model evaluation complete. Results saved in model.eval_results")
+
