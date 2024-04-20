@@ -1,3 +1,7 @@
+"""
+This module contains utility functions for the model training and evaluation.
+"""
+
 from sklearn.metrics import (
     RocCurveDisplay,
     auc,
@@ -11,12 +15,25 @@ import xgboost as xgb
 import lightgbm as lgb
 import catboost as ctb
 import logging
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# TODO: Add docstrings
 
-def evaluate_model(model, config, meta_data, task):
+def evaluate_model(model, config: dict, meta_data: dict[xgb.DMatrix], task: str):
+    """
+    Evaluate the performance of a model on different datasets.
+
+    Args:
+        model: The trained model to evaluate.
+        config (dict): The configuration parameters for the model.
+        meta_data (dict[xgb.DMatrix]): A dictionary containing the datasets to evaluate the model on.
+        task (str): The type of task, either "classification" or "regression".
+
+    Returns:
+        None
+    """
+
     logger.info("Evaluating model")
     # TODO: Add metrics and return them for Ensemblemodel for later use and analysis
     if task == "classification":
@@ -77,8 +94,22 @@ def evaluate_model(model, config, meta_data, task):
 
 
 def fill_params(
-    X_train, y_train, X_val, y_val, config: dict = None, task="classification"
+    X_train, y_train, X_val, y_val, config: dict, task: str = "classification"
 ):
+    """
+    Fills the model parameters in the given configuration dictionary.
+
+    Args:
+        X_train (array-like): The training input samples.
+        y_train (array-like): The target values for the training samples.
+        X_val (array-like): The validation input samples.
+        y_val (array-like): The target values for the validation samples.
+        config (dict): The configuration dictionary to be filled. Defaults to None.
+        task (str, optional): The task type. Defaults to "classification".
+
+    Returns:
+        dict: The updated configuration dictionary.
+    """
     logger.info("Filling model parameters")
     config["train_params"]["xgboost"]["dtrain"] = xgb.DMatrix(X_train, y_train)
     config["train_params"]["xgboost"]["evals"] = [

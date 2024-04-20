@@ -1,3 +1,7 @@
+"""
+This module contains the implementation of the EnsembleModel class.
+"""
+
 import pandas as pd
 import xgboost as xgb
 import lightgbm as lgb
@@ -5,23 +9,51 @@ import catboost as ctb
 from src.utils import fill_params, evaluate_model
 
 import logging
+
 logger = logging.getLogger(__name__)
 
-# TODO: Add docstrings
 # TODO: Add hyperopt
 
+
 class EnsembleModel:
-    def __init__(self, config, task, datasets_):
+    """
+    Initialize the BoostingEnsemble model.
+
+    Args:
+        config (dict): Configuration parameters for the model.
+        task (str): The task type, e.g., "classification" or "regression".
+        datasets_ (dict[str, tuple[pd.DataFrame, pd.Series]]): Dictionary containing the datasets for training, validation, and testing.
+
+    Attributes:
+        config (dict): Configuration parameters for the model.
+        task (str): The task type, e.g., "classification" or "regression".
+        models (list): List of boosting models to be used.
+        fitted_models (list): List to store the fitted models.
+        meta_data: Placeholder for storing meta data.
+        final_model: Placeholder for storing the final model.
+        datasets_ (dict[str, tuple[pd.DataFrame, pd.Series]]): Dictionary containing the datasets for training, validation, and testing.
+    """
+
+    def __init__(
+        self,
+        config: dict,
+        task: str,
+        datasets_: dict[str, tuple[pd.DataFrame, pd.Series]],
+    ):
+
         self.config = config
         self.task = task
         self.models = [xgb, lgb, ctb]
         self.fitted_models = []
         self.meta_data = None
         self.final_model = None
-        self.datasets_ = datasets_  # {"train": (X_train, y_train), "val": (X_val, y_val), "test": (X_test, y_test)}
+        self.datasets_ = datasets_
         self.fill_params_()
 
     def fill_params_(self):
+        """
+        Fills the parameters for the model based on the training and validation datasets.
+        """
         self.config = fill_params(
             *self.datasets_["train"],
             *self.datasets_["val"],
@@ -30,6 +62,12 @@ class EnsembleModel:
         )
 
     def train_basemodels(self):
+        """
+        Trains the base models.
+
+        This method iterates over the list of models and trains each model using the specified parameters
+        from the configuration file. The trained models are then appended to the `fitted_models` list.
+        """
         logger.info("Training base models")
         for class_ in self.models:
             trainer = getattr(class_, "train")
@@ -41,6 +79,15 @@ class EnsembleModel:
             logger.info("%s trained", class_.__name__)
 
     def get_meta_features_(self):
+        """
+        Get meta features from the fitted models. (Their predictions on the train set)
+
+        Raises:
+            ValueError: If the base models are not trained yet.
+
+        Returns:
+            dict: A dictionary containing the meta features for the train, val, and test sets.
+        """
         if self.fitted_models is None:
             raise ValueError("Train base models first")
         logger.info("Getting meta features")
@@ -75,7 +122,8 @@ class EnsembleModel:
             x_meta.columns = [
                 f"{_name}{i}"
                 for _name in [
-                    str(x.__module__).split(".")[0] for x in self.fitted_models
+                    str(x.__module__).split(".", maxsplit=1)[0]
+                    for x in self.fitted_models
                 ]
                 for i in range(n_cols)
             ]
@@ -84,6 +132,12 @@ class EnsembleModel:
         return res
 
     def train(self):
+        """
+        Trains the ensemble model.
+
+        This method trains the ensemble model by first training the base models,
+        then obtaining the meta features, and finally training the final model.
+        """
         logger.info("Training ensemble")
         self.train_basemodels()
         self.meta_data = self.get_meta_features_()
@@ -101,6 +155,17 @@ class EnsembleModel:
         logger.info("Ensemble trained")
 
     def evaluate(self):
+        """
+        Evaluates the final model of the ensemble.
+
+        Raises:
+            ValueError: If the final model is not trained yet.
+        """
         if self.final_model is None:
             raise ValueError("Train ensemble first")
-        evaluate_model(model=self.final_model, config=self.config,meta_data=self.meta_data, task=self.task)
+        evaluate_model(
+            model=self.final_model,
+            config=self.config,
+            meta_data=self.meta_data,
+            task=self.task,
+        )

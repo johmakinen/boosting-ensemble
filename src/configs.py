@@ -1,3 +1,7 @@
+"""
+This file contains the configuration for the training process of the models.
+"""
+
 import lightgbm as lgb
 
 config = {
