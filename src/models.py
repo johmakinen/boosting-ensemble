@@ -13,7 +13,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 # TODO: Add hyperopt
-
+# TODO: Add Dask support
+# TODO: Add benchmarks for some non-trivial datasets (e.g., Kaggle/PapersWithCode)
 
 class EnsembleModel:
     """

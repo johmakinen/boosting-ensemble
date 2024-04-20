@@ -30,6 +30,9 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# TODO: Add Dask support
+# TODO: Add feature importance plots (for each model + final model)
+
 
 def evaluate_model(
     model, config: dict, meta_data: dict[xgb.DMatrix], task: str, plot=True
@@ -110,7 +113,7 @@ def evaluate_model(
                 root_mean_squared_error,
                 median_absolute_error,
                 r2_score,
-                mean_squared_error
+                mean_squared_error,
             ]:
                 results[set_][metric.__name__] = metric(y_, y_pred)
             if plot:
@@ -171,10 +174,20 @@ def fill_params(
     config["train_params"]["catboost"]["pool"] = ctb.Pool(X_train, label=y_train)
     config["train_params"]["catboost"]["eval_set"] = ctb.Pool(X_val, label=y_val)
 
+    # TODO simplify this, it's too verbose
     if task == "classification":
         n_classes = len(set(y_train) & set(y_val))
         config["params"][task]["xgboost"]["num_class"] = n_classes
         config["params"][task]["lightgbm"]["num_class"] = n_classes
         config["params"][task]["final_model"]["num_class"] = n_classes
+
+        if n_classes == 2:
+            config["params"][task]["catboost"]["loss_function"] = "Logloss"
+            # Drop classes count
+            config["params"][task]["catboost"].pop("classes_count", None)
+        else:
+            config["params"][task]["catboost"]["loss_function"] = "MultiClass"
+            config["params"][task]["catboost"]["classes_count"] = n_classes
+
     logger.info("Model parameters filled")
     return config

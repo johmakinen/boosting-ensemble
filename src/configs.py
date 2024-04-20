@@ -55,6 +55,7 @@ config = {
             },
             "catboost": {
                 "loss_function": "Logloss",
+                "classes_count": None,
             },
             "final_model": {
                 "objective": "multi:softprob",
@@ -131,6 +132,7 @@ config_test = {
             },
             "catboost": {
                 "loss_function": "Logloss",
+                "classes_count": None,
             },
             "final_model": {
                 "objective": "multi:softprob",
