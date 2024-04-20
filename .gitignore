@@ -1,3 +1,10 @@
+*.csv
+*.xlsx
+*.xls
+*.tsv
+*.tfevents
+catboost_training.json
+*.log
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
