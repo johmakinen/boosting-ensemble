@@ -75,7 +75,17 @@ def test_fill_params(task, curr_data):
     assert model.config["params"][task]["lightgbm"]["objective"] == (
         "multiclass" if task == "classification" else "regression"
     )
-    assert model.config["params"][task]["catboost"] is not None  # Not empty
+    assert model.config["params"][task]["catboost"] is not None
+
+    # Datasets are filled?
+    assert model.config["train_params"]["xgboost"]["dtrain"] is not None
+    assert model.config["train_params"]["lightgbm"]["train_set"] is not None
+    assert model.config["train_params"]["catboost"]["pool"] is not None
+
+    assert model.config["train_params"]["xgboost"]["evals"][0][0] is not None
+    assert model.config["train_params"]["xgboost"]["evals"][1][0] is not None
+    assert None not in model.config["train_params"]["lightgbm"]["valid_sets"]
+    assert model.config["train_params"]["catboost"]["eval_set"] is not None
 
 
 @pytest.mark.parametrize(
@@ -92,6 +102,9 @@ def test_train_basemodels(task, curr_data):
     print(model.config["params"][task])
     model.train_basemodels()
     assert len(model.fitted_models) == 3
+    assert model.fitted_models[0].num_boosted_rounds() > 0  # xgboost
+    assert model.fitted_models[1].current_iteration() > 0  # lightgbm
+    assert model.fitted_models[2].tree_count_ > 0  # catboost
 
 
 @pytest.mark.parametrize(
