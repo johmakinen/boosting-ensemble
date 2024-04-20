@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # TODO: Add Dask support
 # TODO: Add benchmarks for some non-trivial datasets (e.g., Kaggle/PapersWithCode)
 
+
 class EnsembleModel:
     """
     Initialize the BoostingEnsemble model.
@@ -157,7 +158,7 @@ class EnsembleModel:
         )
         logger.info("Ensemble trained")
 
-    def evaluate(self,plot=True):
+    def evaluate(self, plot=True):
         """
         Evaluates the final model of the ensemble.
 
@@ -174,4 +175,3 @@ class EnsembleModel:
             plot=plot,
         )
         logger.info("Model evaluation complete. Results saved in model.eval_results")
-

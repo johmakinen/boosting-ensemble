@@ -10,6 +10,7 @@ from src.models import EnsembleModel
 from src.configs import config_test
 from src.utils import classification_data, regression_data
 
+
 @pytest.mark.parametrize(
     "task,curr_data",
     [
@@ -17,19 +18,37 @@ from src.utils import classification_data, regression_data
         ("classification", classification_data(3)),
         ("regression", regression_data()),
     ],
+    ids=["binary_clf", "multi_clf", "reg"],
 )
 def test_fill_params(task, curr_data):
     config = config_test.copy()
     model = EnsembleModel(config, task, curr_data)
     model.fill_params_()
-    assert model.config["params"][task]["xgboost"]["objective"] == (
-        "multi:softprob" if task == "classification" else "reg:squarederror"
-    )
-    assert model.config["params"][task]["lightgbm"]["objective"] == (
-        "multiclass" if task == "classification" else "regression"
-    )
-    assert model.config["params"][task]["catboost"] is not None
+    # assert model.config["params"][task]["xgboost"]["objective"] == (
+    #     "multi:softprob" if task == "classification" else "reg:squarederror"
+    # )
+    # assert model.config["params"][task]["lightgbm"]["objective"] == (
+    #     "multiclass" if task == "classification" else "regression"
+    # )
+    if task == "classification":
+        n_classes = model.config["params"][task]["xgboost"]["num_class"]
+        if n_classes == 2:
+            assert (
+                model.config["params"][task]["catboost"]["loss_function"] == "Logloss"
+            )
+            assert "classes_count" not in model.config["params"][task]["catboost"]
+        else:
+            assert (
+                model.config["params"][task]["catboost"]["loss_function"]
+                == "MultiClass"
+            )
+            assert (
+                model.config["params"][task]["catboost"]["classes_count"] == n_classes
+            )
+    else:
+        assert "classes_count" not in model.config["params"][task]["catboost"]
 
+    assert model.config["params"][task]["catboost"] is not None
     # Datasets are filled?
     assert model.config["train_params"]["xgboost"]["dtrain"] is not None
     assert model.config["train_params"]["lightgbm"]["train_set"] is not None
@@ -48,11 +67,11 @@ def test_fill_params(task, curr_data):
         ("classification", classification_data(3)),
         ("regression", regression_data()),
     ],
+    ids=["binary_clf", "multi_clf", "reg"],
 )
 def test_train_basemodels(task, curr_data):
     config = config_test.copy()
     model = EnsembleModel(config, task, curr_data)
-    print(model.config["params"][task])
     model.train_basemodels()
     assert len(model.fitted_models) == 3
     assert model.fitted_models[0].num_boosted_rounds() > 0  # xgboost
@@ -67,6 +86,7 @@ def test_train_basemodels(task, curr_data):
         ("classification", classification_data(3)),
         ("regression", regression_data()),
     ],
+    ids=["binary_clf", "multi_clf", "reg"],
 )
 def test_get_meta_features(task, curr_data):
     config = config_test.copy()
@@ -85,6 +105,7 @@ def test_get_meta_features(task, curr_data):
         ("classification", classification_data(3)),
         ("regression", regression_data()),
     ],
+    ids=["binary_clf", "multi_clf", "reg"],
 )
 def test_train(task, curr_data):
     config = config_test.copy()

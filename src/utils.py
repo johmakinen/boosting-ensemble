@@ -59,7 +59,9 @@ def evaluate_model(
         if plot:
             n_classes = config["params"][task]["xgboost"]["num_class"]
             plot_auc = n_classes == 2
-            _, ax = plt.subplots(1 if not plot_auc else 2, 3, figsize=(15, 10))
+            _, ax = plt.subplots(
+                1 if not plot_auc else 2, 3, figsize=(15, 10 if plot_auc else 5)
+            )
             axes_ = ax.flatten()
         for i, set_ in enumerate(meta_data):
             dmat = meta_data[set_]
@@ -70,9 +72,9 @@ def evaluate_model(
             # TODO: Add more metrics
             # TODO: Add option for weighted metrics
 
-            for metric in [f1_score, accuracy_score, recall_score, precision_score]:
+            for metric in [f1_score, recall_score, precision_score]:
                 results[set_][metric.__name__] = metric(
-                    y_, np.argmax(y_pred_probs, axis=1)
+                    y_, np.argmax(y_pred_probs, axis=1), average="micro"
                 )
 
             if plot:
@@ -174,21 +176,23 @@ def fill_params(
     ]
     config["train_params"]["catboost"]["pool"] = ctb.Pool(X_train, label=y_train)
     config["train_params"]["catboost"]["eval_set"] = ctb.Pool(X_val, label=y_val)
+    logger.info("Filled data")
 
     # TODO simplify this, it's too verbose
     if task == "classification":
-        n_classes = len(set(y_train) & set(y_val))
+        n_classes = len(set(y_train) | set(y_val))
         config["params"][task]["xgboost"]["num_class"] = n_classes
         config["params"][task]["lightgbm"]["num_class"] = n_classes
         config["params"][task]["final_model"]["num_class"] = n_classes
 
         if n_classes == 2:
             config["params"][task]["catboost"]["loss_function"] = "Logloss"
-            # Drop classes count
             config["params"][task]["catboost"].pop("classes_count", None)
+
         else:
             config["params"][task]["catboost"]["loss_function"] = "MultiClass"
             config["params"][task]["catboost"]["classes_count"] = n_classes
+        logger.info("Filled classification parameters")
 
     logger.info("Model parameters filled")
     return config
