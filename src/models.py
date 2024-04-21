@@ -2,17 +2,23 @@
 This module contains the implementation of the EnsembleModel class.
 """
 
+from copy import deepcopy
+
 import pandas as pd
 import xgboost as xgb
 import lightgbm as lgb
 import catboost as ctb
 from src.utils import fill_params, evaluate_model
 
+from hyperopt import STATUS_OK, Trials, fmin, hp, tpe, space_eval
+from hyperopt.early_stop import no_progress_loss
+import numpy as np
+
 import logging
 
 logger = logging.getLogger(__name__)
 
-# TODO: Add hyperopt
+# TODO: model verbosity to be set in config as a global parameter
 # TODO: Add Dask support
 # TODO: Add benchmarks for some non-trivial datasets (e.g., Kaggle/PapersWithCode)
 
@@ -41,6 +47,7 @@ class EnsembleModel:
         config: dict,
         task: str,
         datasets_: dict[str, tuple[pd.DataFrame, pd.Series]],
+        hpo_config: dict = None,
     ):
 
         self.config = config
@@ -51,6 +58,12 @@ class EnsembleModel:
         self.final_model = None
         self.datasets_ = datasets_
         self.eval_results = None
+        self.hpo_config = hpo_config
+        self.hpo_base_params = {
+            "num_boost_round": 5,
+            "early_stopping_rounds": 3,
+            "nfold": 2,
+        }
 
         self.fill_params_()
 
@@ -135,7 +148,7 @@ class EnsembleModel:
             logger.info("%s meta features created", set_)
         return res
 
-    def train(self):
+    def train(self, hpo=False):
         """
         Trains the ensemble model.
 
@@ -143,6 +156,12 @@ class EnsembleModel:
         then obtaining the meta features, and finally training the final model.
         """
         logger.info("Training ensemble")
+        # Ensure models are not fitted yet
+        self.fitted_models = []
+        if hpo:
+            self.hyperopt_model("xgboost")
+            self.hyperopt_model("lightgbm")
+            self.hyperopt_model("catboost")
         self.train_basemodels()
         self.meta_data = self.get_meta_features_()
 
@@ -152,10 +171,14 @@ class EnsembleModel:
             (self.meta_data["val"], "val"),
         ]
 
+        if hpo:
+            self.hyperopt_model("final_model")
+
         self.final_model = xgb.train(
             params=self.config["params"][self.task]["final_model"],
             **self.config["train_params"]["final_model"],
         )
+
         logger.info("Ensemble trained")
 
     def evaluate(self, plot=True):
@@ -175,3 +198,74 @@ class EnsembleModel:
             plot=plot,
         )
         logger.info("Model evaluation complete. Results saved in model.eval_results")
+
+    def hpo_objective(self, space, model_name):
+        model_name_ = (
+            model_name if model_name != "final_model" else "xgboost"
+        )  # This is used because final model is actually xgboost
+        mod_space = deepcopy(space)
+        mod_space.update(self.config["params"][self.task][model_name])
+        curr_basemodel = [x for x in self.models if x.__name__ == model_name_][0]
+        trainset_name = (
+            "train_set"
+            if model_name_ == "lightgbm"
+            else "dtrain" if model_name_ == "xgboost" else "pool"
+        )
+        hpo_base_params = deepcopy(self.hpo_base_params)
+        # TODO: Add these into configs, clean the code
+        if model_name == "lightgbm":
+            hpo_base_params["callbacks"] = [
+                lgb.early_stopping(
+                    stopping_rounds=mod_space.get("early_stopping_rounds", 20),
+                    verbose=False,
+                ),
+                lgb.log_evaluation(period=0),
+            ]
+            del hpo_base_params["early_stopping_rounds"]
+            hpo_base_params["stratified"] = False
+        elif model_name == "catboost":
+            hpo_base_params["logging_level"] = "Silent"
+
+        cv_inputs = {
+            "params": mod_space,
+            trainset_name: self.config["train_params"][model_name][trainset_name],
+        }
+        results = curr_basemodel.cv(**cv_inputs, **hpo_base_params)
+
+        metric_used = self.config["params"][self.task][model_name].get(
+            "eval_metric",
+            self.config["params"][self.task][model_name].get(
+                "metric",
+                self.config["params"][self.task][model_name].get("loss_function"),
+            ),
+        )
+        metric_col = (
+            f"test-{metric_used}-mean"
+            if model_name_ == "xgboost"
+            else (
+                f"valid {metric_used}-mean"
+                if model_name_ == "lightgbm"
+                else f"test-{metric_used}-mean"
+            )
+        )
+        best_score = max(results[metric_col])
+        return {"loss": -best_score, "status": STATUS_OK}
+
+    def hyperopt_model(self, model_name):
+        """
+        Perform hyperparameter optimization on one model
+        """
+        logger.info("Performing hyperparameter optimization on %s", model_name)
+        trials = Trials()
+        best = fmin(
+            fn=lambda space: self.hpo_objective(space, model_name),
+            space=self.hpo_config[model_name],
+            algo=tpe.suggest,
+            max_evals=10,
+            trials=trials,
+            early_stop_fn=no_progress_loss(20),
+            verbose=-False,
+        )
+        best_params = space_eval(self.hpo_config[model_name], best)
+        self.config["params"][self.task][model_name].update(best_params)
+        logger.info("Hyperparameter optimization complete")

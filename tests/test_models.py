@@ -7,7 +7,7 @@ import os
 
 sys.path.append(str(Path(os.getcwd()).parent))
 from src.models import EnsembleModel
-from src.configs import config_test
+from src.configs import config_test, hpo_config_test
 from src.utils import classification_data, regression_data
 
 
@@ -24,12 +24,7 @@ def test_fill_params(task, curr_data):
     config = config_test.copy()
     model = EnsembleModel(config, task, curr_data)
     model.fill_params_()
-    # assert model.config["params"][task]["xgboost"]["objective"] == (
-    #     "multi:softprob" if task == "classification" else "reg:squarederror"
-    # )
-    # assert model.config["params"][task]["lightgbm"]["objective"] == (
-    #     "multiclass" if task == "classification" else "regression"
-    # )
+
     if task == "classification":
         n_classes = model.config["params"][task]["xgboost"]["num_class"]
         if n_classes == 2:
@@ -111,6 +106,23 @@ def test_train(task, curr_data):
     config = config_test.copy()
     model = EnsembleModel(config, task, curr_data)
     model.train()
+    assert model.final_model is not None
+
+
+@pytest.mark.parametrize(
+    "task,curr_data",
+    [
+        ("classification", classification_data(2)),
+        ("classification", classification_data(3)),
+        ("regression", regression_data()),
+    ],
+    ids=["binary_clf", "multi_clf", "reg"],
+)
+def test_train_hpo(task, curr_data):
+    config = config_test.copy()
+    hpo_config = hpo_config_test.copy()
+    model = EnsembleModel(config, task, curr_data, hpo_config)
+    model.train(hpo=True)
     assert model.final_model is not None
 
 
